@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "persistent_memory"
+dynamic = ["version"]
+description = "An object that persists in Redis. Works across instances and works seamlessly through magic functions."
+readme = "README.md"
+authors = [
+    { name = "Sinan Ozel", email = "coding@sinan.slmail.me" },
+]
+license = { file = "LICENSE" }
+dependencies = [
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",         # For running tests
+    "pytest-cov>=3.0.0",     # For test coverage reporting
+    "pytest-mock>=3.14.0",   # For mocking in tests
+]
+
+dev = [
+    "pytest>=7.0.0",         # For running tests
+    "pytest-cov>=3.0.0",     # For test coverage reporting
+    "pytest-mock>=3.14.0",   # For mocking in tests
+    "flake8>=5.0.0",         # For linting
+    "black>=23.0",           # For code formatting
+]
+
+[tool.black]
+line-length = 79
+target-version = ["py39", "py310", "py311"]
+
+[tool.flake8]
+max-line-length = 79
+exclude = ["__pycache__", "*.pyc", "build", "dist"]
+
+[tool.setuptools.dynamic]
+version = { attr = "persistent_memory.__version__" }
+
+[project.urls]
+Homepage = "https://github.com/sinan-ozel/persistent-memory"
+Issues = "https://github.com/sinan-ozel/persistent-memory/issues"
