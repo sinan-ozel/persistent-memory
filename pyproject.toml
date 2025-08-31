@@ -12,6 +12,8 @@ authors = [
 ]
 license = { file = "LICENSE" }
 dependencies = [
+    "redis>=6.1.0"
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -26,20 +28,24 @@ test = [
 ]
 
 dev = [
-    "pytest>=7.0.0",         # For running tests
-    "pytest-cov>=3.0.0",     # For test coverage reporting
-    "pytest-mock>=3.14.0",   # For mocking in tests
-    "flake8>=5.0.0",         # For linting
-    "black>=23.0",           # For code formatting
+    "pytest>=7.0.0",          # For running tests
+    "isort>=5.12.0",          # For import sorting
+    "pytest-cov>=3.0.0",      # For test coverage reporting
+    "pytest-mock>=3.14.0",    # For mocking in tests
+    "flake8>=5.0.0",          # For linting
+    "yapf>=0.40.0",           # For code formatting (YAPF)
+    "docformatter>=1.7.5",
 ]
-
-[tool.black]
-line-length = 79
-target-version = ["py39", "py310", "py311"]
 
 [tool.flake8]
 max-line-length = 79
 exclude = ["__pycache__", "*.pyc", "build", "dist"]
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 80
+split_before_first_argument = false
+dedent_closing_brackets = false
 
 [tool.setuptools.dynamic]
 version = { attr = "persistent_memory.__version__" }
