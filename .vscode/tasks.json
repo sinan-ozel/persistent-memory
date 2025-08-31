@@ -27,7 +27,7 @@
       "label": "Run Unit Tests in Docker (Run inside the .devcontainer)",
       "dependsOn": "Unit Test Cleanup Docker Compose",
       "type": "shell",
-      "command": "pytest tests",
+      "command": "pytest",
       "options": {
         "cwd": "${workspaceFolder}/tests"
       },
@@ -46,9 +46,9 @@
       }
     },
     {
-      "label": "Format Python with YAPF (Run inside the .devcontainer)",
+      "label": "Reformat and Lint (Run inside the .devcontainer)",
       "type": "shell",
-      "command": "yapf --style=pyproject.toml -r -i . && docformatter --in-place --recursive --wrap-summaries 72 --wrap-descriptions 72 src/ && isort src/ && flake8 src/",
+      "command": "yapf --style=pyproject.toml -r -i . && docformatter --in-place --recursive --wrap-summaries 72 --wrap-descriptions 72 src/ && isort src/ && ruff check ./src",
       "options": {
         "cwd": "${workspaceFolder}"
       },

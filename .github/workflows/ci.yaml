@@ -39,10 +39,6 @@ jobs:
         run: |
           isort src/
 
-      - name: Run flake8
-        run: |
-          flake8 src/
-
       - name: Commit changes
         run: |
           git config --global user.email "github-actions@github.com"
@@ -74,9 +70,9 @@ jobs:
           pip install --upgrade pip
           pip install .[dev]
 
-      - name: Run Flake8
+      - name: Run Ruff
         run: |
-          flake8 --config=pyproject.toml ./src
+          ruff check ./src
 
   test:
     runs-on: ubuntu-latest
