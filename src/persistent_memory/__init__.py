@@ -1,16 +1,21 @@
-import os
-import redis
-import pickle
-import time
-import threading
+__version__ = "0.1.0"
 
-from settings import logger
+import logging
+import os
+import pickle
+import threading
+import time
+
+import redis
+
+logger = logging.getLogger("persistent_memory")
+logger.setLevel(os.environ.get("MEMORY_LOG_LEVEL", 'WARNING'))
 
 
 class Memory:
-    """
-    A synchronized key-value store that uses Redis as a shared memory backend.
-    If Redis is unavailable, values are cached locally and queued for later syncing.
+    """A synchronized key-value store that uses Redis as a shared memory
+    backend. If Redis is unavailable, values are cached locally and
+    queued for later syncing.
 
     Environment Variables:
     ----------------------
@@ -43,8 +48,12 @@ class Memory:
     {'a': 1}
     """
 
-    def __init__(self, redis_hostname: str='redis', redis_port: int=6379, redis_prefix: str='memory:'):
-        """Initialize the Memory instance and flush any queued updates."""
+    def __init__(self,
+                 redis_hostname: str = 'redis',
+                 redis_port: int = 6379,
+                 redis_prefix: str = 'memory:'):
+        """Initialize the Memory instance and flush any queued
+        updates."""
         self._host = os.environ.get('REDIS_HOST', redis_hostname)
         self._port = int(os.environ.get('REDIS_PORT', redis_port))
         self._prefix = redis_prefix
@@ -85,8 +94,7 @@ class Memory:
         self.stop_background_flush()
 
     def _connect(self):
-        """
-        Establish a new Redis connection.
+        """Establish a new Redis connection.
 
         Returns:
             redis.Redis or None: A Redis client if connection works; otherwise None.
@@ -105,7 +113,8 @@ class Memory:
         return f"{self._prefix}{name}"
 
     def _flush_queue(self):
-        """Keep trying to connect to Redis and flush the full queue when connected."""
+        """Keep trying to connect to Redis and flush the full queue when
+        connected."""
         while True:
             try:
                 client = self._connect()
@@ -122,7 +131,6 @@ class Memory:
                 client.set(self._key(key), pickle.dumps(value))
             self._is_connected_to_redis_at_least_once = True
 
-
     def _background_flush_loop(self):
         while not self._stop_event.is_set():
             if self._queue:
@@ -130,10 +138,12 @@ class Memory:
             time.sleep(1)
 
     def start_background_flush(self):
-        """Start the background thread to flush the queue periodically."""
+        """Start the background thread to flush the queue
+        periodically."""
         if self._thread is None or not self._thread.is_alive():
             self._stop_event.clear()
-            self._thread = threading.Thread(target=self._background_flush_loop, daemon=True)
+            self._thread = threading.Thread(target=self._background_flush_loop,
+                                            daemon=True)
             self._thread.start()
 
     def stop_background_flush(self):
@@ -144,7 +154,8 @@ class Memory:
             self._thread = None
 
     def _load_from_redis(self):
-        """Load all keys with the current prefix from Redis into local cache."""
+        """Load all keys with the current prefix from Redis into local
+        cache."""
         try:
             client = self._connect()
             pattern = f"{self._prefix}*"
@@ -161,8 +172,8 @@ class Memory:
 
     # TODO: Add classes to support .append and .extend for lists and dictionaries.
     def __setattr__(self, name, value):
-        """
-        Set an attribute. Store in Redis if available, otherwise queue it.
+        """Set an attribute. Store in Redis if available, otherwise
+        queue it.
 
         Raises:
             ValueError: If the value is not serializable.
@@ -181,7 +192,8 @@ class Memory:
 
         try:
             client = self._connect()
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError, OSError):
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError,
+                OSError):
             logger.warning("Redis unavailable. Queuing %s = %s", name, value)
             self._queue.append((name, value))
             return
@@ -189,10 +201,8 @@ class Memory:
         client.set(self._key(name), serialized)
         self._is_connected_to_redis_at_least_once = True
 
-
     def __getattr__(self, name):
-        """
-        Get an attribute from Redis or fall back to local cache.
+        """Get an attribute from Redis or fall back to local cache.
 
         Raises:
             AttributeError: If the attribute is not found.
@@ -219,8 +229,8 @@ class Memory:
         raise AttributeError(f"'Memory' object has no attribute '{name}'")
 
     def __delattr__(self, name):
-        """
-        Delete an attribute from local cache and Redis (or queue deletion if Redis unavailable).
+        """Delete an attribute from local cache and Redis (or queue
+        deletion if Redis unavailable).
 
         Raises:
             AttributeError: If the attribute is not found.
@@ -249,8 +259,7 @@ class Memory:
 
 
 class ConversationMemory(Memory):
-    """
-    Memory subclass that namespaces keys by conversation ID.
+    """Memory subclass that namespaces keys by conversation ID.
 
     Args:
         conversation_id (str): Unique ID to isolate this conversation's memory.
@@ -259,9 +268,15 @@ class ConversationMemory(Memory):
         redis_prefix (str): Base prefix for keys (default 'memory:').
     """
 
-    def __init__(self, conversation_id: str, redis_hostname='redis', redis_port=6379, redis_prefix='memory:'):
+    def __init__(self,
+                 conversation_id: str,
+                 redis_hostname='redis',
+                 redis_port=6379,
+                 redis_prefix='memory:'):
         self._conversation_id = conversation_id
-        super().__init__(redis_hostname=redis_hostname, redis_port=redis_port, redis_prefix=redis_prefix)
+        super().__init__(redis_hostname=redis_hostname,
+                         redis_port=redis_port,
+                         redis_prefix=redis_prefix)
 
     def _key(self, name):
         # Override to include conversation_id in the Redis key
