@@ -1,0 +1,70 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Unit Tests in Docker (Run outside the .devcontainer)",
+      "dependsOn": "Unit Test Cleanup Docker Compose",
+      "type": "shell",
+      "command": "docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test",
+      "options": {
+        "cwd": "${workspaceFolder}/tests"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    },
+    {
+      "label": "Run Unit Tests in Docker (Run inside the .devcontainer)",
+      "dependsOn": "Unit Test Cleanup Docker Compose",
+      "type": "shell",
+      "command": "pytest tests",
+      "options": {
+        "cwd": "${workspaceFolder}/tests"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    },
+    {
+      "label": "Format Python with YAPF (Run inside the .devcontainer)",
+      "type": "shell",
+      "command": "yapf --style=pyproject.toml -r -i . && docformatter --in-place --recursive --wrap-summaries 72 --wrap-descriptions 72 src/ && isort src/ && flake8 src/",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    }
+  ]
+}
