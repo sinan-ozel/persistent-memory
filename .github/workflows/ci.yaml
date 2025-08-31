@@ -1,0 +1,176 @@
+name: CI/CD Pipeline
+
+env:
+  MODULE_NAME: persistent_memory
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  reformat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.11"
+
+      - name: Install Formatting Tools
+        run: |
+          pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Run YAPF
+        run: |
+          yapf --style=pyproject.toml -r -i .
+
+      - name: Run docformatter
+        run: |
+          docformatter --in-place --recursive --wrap-summaries 72 --wrap-descriptions 72 src/
+
+      - name: Run isort
+        run: |
+          isort src/
+
+      - name: Run flake8
+        run: |
+          flake8 src/
+
+      - name: Commit changes
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git add .
+          git commit -m "Auto reformat code via workflow" || echo "No changes to commit"
+
+      - name: Push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+          git push origin HEAD:${{ github.ref }}
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies for Linting
+        run: |
+          pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Run Flake8
+        run: |
+          flake8 --config=pyproject.toml ./src
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint  # Ensures linting runs before tests
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Run Tests In Docker
+        run: |
+          docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test
+
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
+    needs: test  # Ensures tests pass before building and uploading
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+
+      - name: Setup Git Authentication
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Get The Last Git Tag
+        id: git-last-tag
+        run: |
+          # Get the last Git tag (stable version)
+          LAST_TAG=$(git describe --tags --abbrev=0 || echo "v0.1.0")
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          echo "Last Git Tag: $LAST_TAG"
+
+      - name: Get Current Version
+        id: get-current-version
+        run: |
+          ls -la
+          cd ./src
+          CURRENT_VERSION=$(python -c "from $MODULE_NAME import __version__; print(__version__)")
+          echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+          echo "Current Version: $CURRENT_VERSION"
+
+      - name: Determine Final Version
+        id: set-version
+        run: |
+          if [[ "v$CURRENT_VERSION" != "$LAST_TAG" ]]; then
+            echo "VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+            echo "is_stable=true" >> $GITHUB_ENV
+          else
+            # Increment minor version for dev version
+            MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+            MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+            PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+            NEXT_MINOR=$((MINOR + 1))
+            DEV_VERSION="${MAJOR}.${NEXT_MINOR}.0.dev$(date +%Y%m%d%H%M)"
+            echo "VERSION=$DEV_VERSION" >> $GITHUB_ENV
+            echo "is_stable=false" >> $GITHUB_ENV
+          fi
+
+      - name: Inject Version Into __init__.py
+        if: env.is_stable == 'false'
+        run: |
+          sed -i "s/^__version__ = .*/__version__ = \"$VERSION\"/" src/$MODULE_NAME/__init__.py
+          cat src/$MODULE_NAME/__init__.py | grep "__version__"  # Debugging check
+
+      - name: Tag Stable Release
+        if: env.is_stable == 'true'
+        run: |
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload to PyPI
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          twine upload dist/* -u __token__ -p "$PYPI_TOKEN"
