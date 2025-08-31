@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    image: persistent-memory-dev
+    volumes:
+      - ..:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - MEMORY_LOG_LEVEL=DEBUG
+    command: ["tail", "-f", "/dev/null"]
+    depends_on:
+      - redis
+    privileged: true
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

@@ -1,0 +1,22 @@
+{
+  "name": "Persistent Memory DevContainer",
+  "dockerComposeFile": [
+    "docker-compose.yaml"
+  ],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter"
+      ]
+    }
+  },
+  "forwardPorts": [6379],
+  "remoteUser": "root"
+}
