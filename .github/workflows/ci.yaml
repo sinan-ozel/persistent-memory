@@ -99,10 +99,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
-    needs: test  # Ensures tests pass before building and uploading
+    needs: [test, lint]
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Python 3.10
         uses: actions/setup-python@v2
