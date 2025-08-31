@@ -59,6 +59,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    needs: reformat
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
