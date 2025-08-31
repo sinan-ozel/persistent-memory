@@ -215,9 +215,10 @@ def test_delete_attribute_queues_if_redis_down(monkeypatch):
     assert ("queued_key", None) in mem_down._queue
 
 
-@pytest.mark.depends(on=['test_set_and_delete_attribute',
-                         'test_queue_flush_when_redis_restored',
-                         'test_queue_overwrite_before_redis_restored'])
+@pytest.mark.depends(on=[
+    'test_set_and_delete_attribute', 'test_queue_flush_when_redis_restored',
+    'test_queue_overwrite_before_redis_restored'
+])
 def test_background_flush_automatically(monkeypatch):
     """Test that the background flush loop automatically flushes queued data when Redis comes back online."""
 
