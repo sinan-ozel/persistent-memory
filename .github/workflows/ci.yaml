@@ -78,7 +78,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: lint  # Ensures linting runs before tests
+    needs: reformat
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
@@ -92,6 +92,7 @@ jobs:
           sudo apt-get install -y docker-compose
 
       - name: Run Tests In Docker
+        working-directory: tests
         run: |
           docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test
 
