@@ -113,6 +113,14 @@ jobs:
       - name: Detect changes in src/
         id: set_changed
         run: |
+          # Check if there are any tags
+          TAG_COUNT=$(git tag | wc -l)
+          if [ "$TAG_COUNT" -eq 0 ]; then
+            echo "No tags found, assuming initial publish. Marking as changed."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           BASE_COMMIT=$(git merge-base HEAD origin/main || echo "")
           echo "BASE_COMMIT=$BASE_COMMIT"
           if [ -z "$BASE_COMMIT" ]; then
