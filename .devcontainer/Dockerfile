@@ -7,6 +7,7 @@ RUN apt-get update
 RUN apt-get install -y build-essential
 RUN apt-get install -y git
 RUN apt-get install -y docker.io
+RUN apt-get install -y vim
 RUN rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
