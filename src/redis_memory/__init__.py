@@ -1,8 +1,8 @@
 __version__ = "0.1.0"
 
+import json
 import logging
 import os
-import json
 import threading
 import time
 
@@ -170,7 +170,9 @@ class Memory:
                 try:
                     raw = client.get(key)
                     obj = json.loads(raw)
-                    if isinstance(obj, dict) and "value" in obj and "last_modified" in obj:
+                    if isinstance(
+                            obj,
+                            dict) and "value" in obj and "last_modified" in obj:
                         self._attributes[name] = obj["value"]
                         self._last_modified[name] = obj["last_modified"]
                     else:
@@ -205,8 +207,7 @@ class Memory:
 
         try:
             client = self._connect()
-        except (redis.exceptions.ConnectionError,
-                redis.exceptions.TimeoutError,
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError,
                 OSError):
             logger.warning("Redis unavailable. Queuing %s = %s", name, value)
             self._queue.append((name, payload))
@@ -236,7 +237,8 @@ class Memory:
         raw = client.get(self._key(name))
         if raw is not None:
             obj = json.loads(raw)
-            if isinstance(obj, dict) and "value" in obj and "last_modified" in obj:
+            if isinstance(obj,
+                          dict) and "value" in obj and "last_modified" in obj:
                 value = obj["value"]
                 self._attributes[name] = value
                 self._last_modified[name] = obj["last_modified"]
