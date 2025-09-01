@@ -184,8 +184,8 @@ jobs:
       - name: Determine Final Version
         id: set-version
         run: |
-          # Compare semantic versions using external script
-          if ! python3 /workspace/scripts/semver_compare.py "$CURRENT_VERSION" "${LAST_TAG#v}"; then
+          LAST_TAG_STRIPPED="${LAST_TAG#v}"
+          if ! python3 scripts/semver_compare.py "$CURRENT_VERSION" "$LAST_TAG_STRIPPED"; then
             echo "Error: CURRENT_VERSION ($CURRENT_VERSION) is not greater than or equal to LAST_TAG ($LAST_TAG)"
             exit 1
           fi
