@@ -25,7 +25,7 @@
     {
       "label": "Run Unit Tests (Run inside the .devcontainer)",
       "type": "shell",
-      "command": "pytest -v",
+      "command": "pytest -v -x",
       "options": {
         "cwd": "${workspaceFolder}/tests"
       },

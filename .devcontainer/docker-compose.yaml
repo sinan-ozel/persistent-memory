@@ -4,12 +4,13 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
-    image: persistent-memory-dev
+    image: redis-memory-dev
     volumes:
       - ..:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - MEMORY_LOG_LEVEL=DEBUG
+      - PYTHONPATH=/workspace/src
     command: ["tail", "-f", "/dev/null"]
     depends_on:
       - redis
