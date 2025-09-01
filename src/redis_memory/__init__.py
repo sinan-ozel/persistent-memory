@@ -2,13 +2,13 @@ __version__ = "0.1.0"
 
 import logging
 import os
-import pickle
+import json
 import threading
 import time
 
 import redis
 
-logger = logging.getLogger("persistent_memory")
+logger = logging.getLogger("redis_memory")
 logger.setLevel(os.environ.get("MEMORY_LOG_LEVEL", 'WARNING'))
 
 
@@ -61,6 +61,7 @@ class Memory:
 
         self._queue = []
         self._attributes = {}
+        self._last_modified = {}  # Track last modified timestamps
 
         self._stop_event = threading.Event()
         self._thread = None
@@ -113,8 +114,7 @@ class Memory:
         return f"{self._prefix}{name}"
 
     def _flush_queue(self):
-        """Keep trying to connect to Redis and flush the full queue when
-        connected."""
+        """Keep trying to connect to Redis and flush when connected."""
         while True:
             try:
                 client = self._connect()
@@ -122,13 +122,19 @@ class Memory:
             except Exception:
                 time.sleep(1)  # Wait before retrying
 
-        # Flush the entire queue (do not catch errors)
+        # Flush the entire queue
         while self._queue:
             key, value = self._queue.pop(0)
             if value is None:
-                client.delete(self._key(key))
+                try:
+                    client.delete(self._key(key))
+                except Exception as e:
+                    logger.exception("Failed to delete key %s: %s", key, e)
             else:
-                client.set(self._key(key), pickle.dumps(value))
+                try:
+                    client.set(self._key(key), json.dumps(value))
+                except Exception as e:
+                    logger.exception("Failed to set key %s: %s", key, e)
             self._is_connected_to_redis_at_least_once = True
 
     def _background_flush_loop(self):
@@ -162,15 +168,19 @@ class Memory:
             for key in client.scan_iter(match=pattern):
                 name = key.decode().replace(self._prefix, '', 1)
                 try:
-                    value = pickle.loads(client.get(key))
-                    self._attributes[name] = value
+                    raw = client.get(key)
+                    obj = json.loads(raw)
+                    if isinstance(obj, dict) and "value" in obj and "last_modified" in obj:
+                        self._attributes[name] = obj["value"]
+                        self._last_modified[name] = obj["last_modified"]
+                    else:
+                        self._attributes[name] = obj
                     self._is_connected_to_redis_at_least_once = True
                 except Exception as e:
                     logger.warning("Failed to load key %s: %s", key, e)
         except Exception:
             logger.warning("Redis unavailable. Cannot preload attributes.")
 
-    # TODO: Add classes to support .append and .extend for lists and dictionaries.
     def __setattr__(self, name, value):
         """Set an attribute. Store in Redis if available, otherwise
         queue it.
@@ -183,22 +193,26 @@ class Memory:
             return
 
         try:
-            serialized = pickle.dumps(value)
-        except pickle.PicklingError:
+            serialized_value = json.dumps(value)
+        except json.JSONDecodeError:
             logger.error("Cannot serialize value for attribute '%s'", name)
             raise
 
         self._attributes[name] = value
+        timestamp = time.time_ns()
+        self._last_modified[name] = timestamp
+        payload = {"value": value, "last_modified": timestamp}
 
         try:
             client = self._connect()
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError,
+        except (redis.exceptions.ConnectionError,
+                redis.exceptions.TimeoutError,
                 OSError):
             logger.warning("Redis unavailable. Queuing %s = %s", name, value)
-            self._queue.append((name, value))
+            self._queue.append((name, payload))
             return
 
-        client.set(self._key(name), serialized)
+        client.set(self._key(name), json.dumps(payload))
         self._is_connected_to_redis_at_least_once = True
 
     def __getattr__(self, name):
@@ -221,8 +235,14 @@ class Memory:
 
         raw = client.get(self._key(name))
         if raw is not None:
-            value = pickle.loads(raw)
-            self._attributes[name] = value
+            obj = json.loads(raw)
+            if isinstance(obj, dict) and "value" in obj and "last_modified" in obj:
+                value = obj["value"]
+                self._attributes[name] = value
+                self._last_modified[name] = obj["last_modified"]
+            else:
+                value = obj
+                self._attributes[name] = value
             self._is_connected_to_redis_at_least_once = True
             return value
 
@@ -244,6 +264,8 @@ class Memory:
 
         # Remove from local cache
         del self._attributes[name]
+        if name in self._last_modified:
+            del self._last_modified[name]
 
         try:
             client = self._connect()

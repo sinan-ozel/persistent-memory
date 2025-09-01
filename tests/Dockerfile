@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy pyproject.toml from the parent directory
 COPY pyproject.toml .
-COPY src/persistent_memory ./persistent_memory
+COPY src/redis_memory ./redis_memory
 
 RUN pip install --upgrade pip
 RUN pip install .           # Install main project dependencies

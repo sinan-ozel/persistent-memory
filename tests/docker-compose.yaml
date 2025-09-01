@@ -4,7 +4,7 @@ services:
     build:
       context: ..
       dockerfile: tests/Dockerfile
-    image: persistent-memory-tests
+    image: redis-memory-tests
     command: pytest
     working_dir: /app
     environment:

@@ -5,7 +5,7 @@ import time
 import pytest
 import redis
 
-from persistent_memory import Memory
+from redis_memory import Memory
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -169,6 +169,10 @@ def test_memory_with_custom_prefix():
 
     # Verify it's saved under the custom prefix
     assert get_redis_value("status", prefix=custom_prefix) == "active"
+
+    mem.status = None
+    assert mem.status is None
+    assert get_redis_value("status", prefix=custom_prefix) is None
 
 
 def test_set_and_delete_attribute(monkeypatch):

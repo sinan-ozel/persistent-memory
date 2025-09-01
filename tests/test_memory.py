@@ -1,11 +1,11 @@
 import os
-import pickle
+import json
 import time
 
 import pytest
 import redis
 
-from persistent_memory import Memory
+from redis_memory import Memory
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -32,7 +32,15 @@ def get_redis_value(key: str, prefix='memory:', host='redis', port=6379):
     client = redis.Redis(host=host, port=port)
     raw = client.get(f"{prefix}{key}")
     if raw is not None:
-        return pickle.loads(raw)
+        return json.loads(raw)
+    return None
+
+
+def get_redis_value_obj(key: str, prefix='memory:', host='redis', port=6379):
+    client = redis.Redis(host=host, port=port)
+    raw = client.get(f"{prefix}{key}")
+    if raw is not None:
+        return json.loads(raw)
     return None
 
 
@@ -42,7 +50,10 @@ def test_set_and_get_scalar():
     mem2 = Memory()
     mem1.answer = 42
     assert mem2.answer == 42
-    assert get_redis_value("answer") == 42
+    obj = get_redis_value_obj("answer")
+    assert obj["value"] == 42
+    assert isinstance(obj["last_modified"], int)
+    assert mem1._last_modified["answer"] == obj["last_modified"]
 
 
 def test_set_and_get_dict():
@@ -51,7 +62,10 @@ def test_set_and_get_dict():
     expected = {"theme": "dark", "volume": 0.75}
     mem.settings = expected
     assert mem.settings == expected
-    assert get_redis_value("settings") == expected
+    obj = get_redis_value_obj("settings")
+    assert obj["value"] == expected
+    assert isinstance(obj["last_modified"], int)
+    assert mem._last_modified["settings"] == obj["last_modified"]
 
 
 def test_set_and_get_list():
@@ -60,17 +74,23 @@ def test_set_and_get_list():
     expected = [1, 2, 3]
     mem.items = expected
     assert mem.items == expected
-    assert get_redis_value("items") == expected
+    obj = get_redis_value_obj("items")
+    assert obj["value"] == expected
+    assert isinstance(obj["last_modified"], int)
+    assert mem._last_modified["items"] == obj["last_modified"]
 
 
 def test_overwrite_existing_key():
     """Test that assigning a new value overwrites the existing Redis key."""
     mem = Memory()
     mem.key = "initial"
-    assert get_redis_value("key") == "initial"
+    obj1 = get_redis_value_obj("key")
+    assert obj1["value"] == "initial"
     mem.key = "updated"
     assert mem.key == "updated"
-    assert get_redis_value("key") == "updated"
+    obj2 = get_redis_value_obj("key")
+    assert obj2["value"] == "updated"
+    assert obj2["last_modified"] >= obj1["last_modified"]
 
 
 def test_missing_attribute_raises():
@@ -93,12 +113,19 @@ def test_multiple_instances_consistency():
     m2 = Memory()
     m1.shared = {"a": 10}
     assert m2.shared == {"a": 10}
+    obj = get_redis_value_obj("shared")
+    assert obj["value"] == {"a": 10}
+    assert isinstance(obj["last_modified"], int)
 
 
 def test_attribute_persistence_across_instances():
     """Test that attributes persist across new Memory instances."""
     Memory().temp = "hello"
-    assert Memory().temp == "hello"
+    mem = Memory()
+    assert mem.temp == "hello"
+    obj = get_redis_value_obj("temp")
+    assert obj["value"] == "hello"
+    assert isinstance(obj["last_modified"], int)
 
 
 def test_queue_flush_when_redis_restored(monkeypatch):
@@ -112,7 +139,8 @@ def test_queue_flush_when_redis_restored(monkeypatch):
     mem.foo = "bar"
 
     # Confirm value is queued
-    assert ("foo", "bar") in mem._queue
+    assert mem._queue[-1][0] == "foo"
+    assert mem._queue[-1][1]["value"] == "bar"
     assert mem.foo == "bar"
 
     # Simulate Redis restored
@@ -123,10 +151,9 @@ def test_queue_flush_when_redis_restored(monkeypatch):
     mem_restored._queue = mem._queue.copy()
     mem_restored._flush_queue()
 
-    client = redis.Redis(host='redis', port=6379)
-    raw = client.get("memory:foo")
-    assert raw is not None
-    assert pickle.loads(raw) == "bar"
+    obj = get_redis_value_obj("foo")
+    assert obj["value"] == "bar"
+    assert isinstance(obj["last_modified"], int)
 
 
 def test_queue_overwrite_before_redis_restored(monkeypatch):
@@ -140,7 +167,8 @@ def test_queue_overwrite_before_redis_restored(monkeypatch):
     mem.config = {"a": 2}
 
     assert mem.config == {"a": 2}
-    assert mem._queue[-1] == ("config", {"a": 2})
+    assert mem._queue[-1][0] == "config"
+    assert mem._queue[-1][1]["value"] == {"a": 2}
 
     # Redis comes back online
     monkeypatch.setenv('REDIS_HOST', 'redis')
@@ -150,10 +178,9 @@ def test_queue_overwrite_before_redis_restored(monkeypatch):
     mem_restored._queue = mem._queue.copy()
     mem_restored._flush_queue()
 
-    client = redis.Redis(host='redis', port=6379)
-    raw = client.get("memory:config")
-    assert raw is not None
-    assert pickle.loads(raw) == {"a": 2}
+    obj = get_redis_value_obj("config")
+    assert obj["value"] == {"a": 2}
+    assert isinstance(obj["last_modified"], int)
 
 
 @pytest.mark.depends(on=['test_set_and_get_scalar'])
@@ -168,7 +195,9 @@ def test_memory_with_custom_prefix():
     assert get_redis_value("status", prefix="memory:") is None
 
     # Verify it's saved under the custom prefix
-    assert get_redis_value("status", prefix=custom_prefix) == "active"
+    obj = get_redis_value_obj("status", prefix=custom_prefix)
+    assert obj["value"] == "active"
+    assert isinstance(obj["last_modified"], int)
 
 
 def test_set_and_delete_attribute(monkeypatch):
@@ -199,13 +228,8 @@ def test_delete_attribute_queues_if_redis_down(monkeypatch):
     mem_down = Memory(redis_prefix=mem._prefix)
     mem_down._attributes = mem._attributes.copy()  # simulate state carry-over
 
-    print(mem_down._attributes)
     # Delete attribute, should queue deletion
     del mem_down.queued_key
-    print(mem_down._attributes)
-
-    client = redis.Redis(host='redis', port=6379)
-    print(client.keys())
 
     # Should raise since it's removed from local cache
     with pytest.raises(AttributeError):
@@ -231,7 +255,8 @@ def test_background_flush_automatically(monkeypatch):
     mem.test_key = "queued_value"
 
     assert mem._attributes.get("test_key") == "queued_value"
-    assert ("test_key", "queued_value") in mem._queue
+    assert mem._queue[-1][0] == "test_key"
+    assert mem._queue[-1][1]["value"] == "queued_value"
     assert mem.test_key == "queued_value"
 
     # Redis comes back online
@@ -244,11 +269,9 @@ def test_background_flush_automatically(monkeypatch):
     # Wait for background thread to pick up the connection and flush
     time.sleep(2)
 
-    client = redis.Redis(host='redis', port=6379)
-    print(client.keys())
-    raw = client.get(mem._key("test_key"))
-    assert raw is not None
-    assert pickle.loads(raw) == "queued_value"
+    obj = get_redis_value_obj("test_key")
+    assert obj["value"] == "queued_value"
+    assert isinstance(obj["last_modified"], int)
 
     # Clean up
     del mem.test_key
@@ -266,6 +289,7 @@ def test_memory_loads_existing_keys_on_init():
     # Should have preloaded the same key from Redis
     assert "user" in mem2._attributes
     assert mem2.user == {"name": "Alice", "role": "admin"}
+    assert isinstance(mem2._last_modified["user"], int)
 
 
 def test_basic_context_set_and_get():
@@ -278,6 +302,7 @@ def test_basic_context_set_and_get():
 
     with Memory() as memory:
         assert memory.test_key == "hello world"
+        assert isinstance(memory._last_modified["test_key"], int)
 
 
 def test_context_lifecycle_and_del():
@@ -294,6 +319,7 @@ def test_context_lifecycle_and_del():
     # Reload and check persistence
     with Memory() as memory:
         assert memory.context == "Je me souviens."
+        assert isinstance(memory._last_modified["context"], int)
 
 
 def test_non_serializable_value():
@@ -301,7 +327,7 @@ def test_non_serializable_value():
     Test that assigning a non-serializable value (e.g., a lambda function)
     to a Memory attribute raises a PicklingError.
     """
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
         with Memory() as memory:
             memory.bad = lambda x: x * 2  # Not serializable
 
