@@ -140,6 +140,8 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     needs: [test, lint, detect_changes]
     if: needs.detect_changes.outputs.changed == 'true' && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
     steps:
