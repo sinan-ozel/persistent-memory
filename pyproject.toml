@@ -37,6 +37,7 @@ dev = [
     "ruff>=0.12.11",          # For linting
     "yapf>=0.40.0",           # For code formatting (YAPF)
     "docformatter>=1.7.5",    # For formatting docstrings
+    "packaging>=25.0",
 ]
 
 [tool.ruff]
