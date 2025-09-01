@@ -96,39 +96,10 @@ jobs:
         run: |
           docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test
 
-  detect_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.set_changed.outputs.changed }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Ensure full history
-
-      - name: Fetch main branch
-        run: |
-          git fetch origin main:refs/remotes/origin/main
-
-      - name: Detect changes in src/
-        id: set_changed
-        run: |
-          BASE_COMMIT=$(git merge-base HEAD origin/main || echo "")
-          if [ -z "$BASE_COMMIT" ]; then
-            echo "No valid base commit found, assuming changes present."
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            if git diff --name-only $BASE_COMMIT HEAD | grep -E '^src/' > /dev/null; then
-              echo "changed=true" >> $GITHUB_OUTPUT
-            else
-              echo "changed=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
   publish:
     runs-on: ubuntu-latest
-    needs: [test, lint, detect_changes]
-    if: needs.detect_changes.outputs.changed == 'true' && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
+    needs: [test, lint]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
