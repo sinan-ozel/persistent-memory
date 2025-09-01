@@ -114,13 +114,18 @@ jobs:
         id: set_changed
         run: |
           BASE_COMMIT=$(git merge-base HEAD origin/main || echo "")
+          echo "BASE_COMMIT=$BASE_COMMIT"
           if [ -z "$BASE_COMMIT" ]; then
             echo "No valid base commit found, assuming changes present."
             echo "changed=true" >> $GITHUB_OUTPUT
           else
+            echo "Changed files:"
+            git diff --name-only $BASE_COMMIT HEAD
             if git diff --name-only $BASE_COMMIT HEAD | grep -E '^(src/)' > /dev/null; then
+              echo "Detected changes in src/"
               echo "changed=true" >> $GITHUB_OUTPUT
             else
+              echo "No changes detected in src/"
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
           fi
