@@ -205,6 +205,3 @@ jobs:
 
       - name: Publish to PyPI via Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # No token needed!
-          # repository-url: https://upload.pypi.org/legacy/  # Optional, defaults to PyPI
