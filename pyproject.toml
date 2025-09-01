@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "persistent_memory"
+name = "redis_memory"
 dynamic = ["version"]
 description = "An object that persists in Redis. Works across instances and works seamlessly through magic functions."
 readme = "README.md"
@@ -49,8 +49,8 @@ split_before_first_argument = false
 dedent_closing_brackets = false
 
 [tool.setuptools.dynamic]
-version = { attr = "persistent_memory.__version__" }
+version = { attr = "redis_memory.__version__" }
 
 [project.urls]
-Homepage = "https://github.com/sinan-ozel/persistent-memory"
-Issues = "https://github.com/sinan-ozel/persistent-memory/issues"
+Homepage = "https://github.com/sinan-ozel/redis-memory"
+Issues = "https://github.com/sinan-ozel/redis-memory/issues"

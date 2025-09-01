@@ -3,7 +3,6 @@
   "tasks": [
     {
       "label": "Run Unit Tests in Docker (Run outside the .devcontainer)",
-      "dependsOn": "Unit Test Cleanup Docker Compose",
       "type": "shell",
       "command": "docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test",
       "options": {
