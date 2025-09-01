@@ -170,9 +170,8 @@ class Memory:
                 try:
                     raw = client.get(key)
                     obj = json.loads(raw)
-                    if isinstance(
-                            obj,
-                            dict) and "value" in obj and "last_modified" in obj:
+                    if (isinstance(obj, dict) and "value" in obj
+                            and "last_modified" in obj):
                         self._attributes[name] = obj["value"]
                         self._last_modified[name] = obj["last_modified"]
                     else:
@@ -195,7 +194,7 @@ class Memory:
             return
 
         try:
-            serialized_value = json.dumps(value)
+            _ = json.dumps(value)
         except json.JSONDecodeError:
             logger.error("Cannot serialize value for attribute '%s'", name)
             raise
@@ -237,8 +236,8 @@ class Memory:
         raw = client.get(self._key(name))
         if raw is not None:
             obj = json.loads(raw)
-            if isinstance(obj,
-                          dict) and "value" in obj and "last_modified" in obj:
+            if (isinstance(obj, dict) and "value" in obj
+                    and "last_modified" in obj):
                 value = obj["value"]
                 self._attributes[name] = value
                 self._last_modified[name] = obj["last_modified"]
