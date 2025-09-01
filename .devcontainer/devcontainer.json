@@ -18,7 +18,8 @@
         "cweijan.vscode-redis-client",
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-toolsai.jupyter"
+        "ms-toolsai.jupyter",
+        "stkb.rewrap"
       ]
     }
   },

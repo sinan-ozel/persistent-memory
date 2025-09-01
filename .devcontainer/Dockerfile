@@ -15,4 +15,5 @@ COPY src/ .
 
 # Install Python dependencies
 RUN pip install --upgrade pip
+RUN pip install .[test]
 RUN pip install -e .[dev]
