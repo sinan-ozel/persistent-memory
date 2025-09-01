@@ -103,11 +103,16 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensure full history
+
+      - name: Fetch main branch
+        run: |
+          git fetch origin main:refs/remotes/origin/main
 
       - name: Detect changes in src/
         id: set_changed
         run: |
-          # Find a valid base commit to diff against
           BASE_COMMIT=$(git merge-base HEAD origin/main || echo "")
           if [ -z "$BASE_COMMIT" ]; then
             echo "No valid base commit found, assuming changes present."
