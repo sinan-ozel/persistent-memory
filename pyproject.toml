@@ -40,6 +40,10 @@ dev = [
     "packaging>=25.0",
 ]
 
+publish = [
+    "packaging>=25.0",
+]
+
 [tool.ruff]
 line-length = 80
 
