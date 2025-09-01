@@ -15,6 +15,7 @@
         "python.defaultInterpreterPath": "/usr/local/bin/python"
       },
       "extensions": [
+        "cweijan.vscode-redis-client",
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-toolsai.jupyter"
