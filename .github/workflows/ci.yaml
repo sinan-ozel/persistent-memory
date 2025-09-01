@@ -110,7 +110,7 @@ jobs:
         run: |
           git fetch origin main:refs/remotes/origin/main
 
-      - name: Detect changes in src/
+      - name: Detect changes in src/ or README
         id: set_changed
         run: |
           # Check if there are any tags
@@ -129,11 +129,11 @@ jobs:
           else
             echo "Changed files:"
             git diff --name-only $BASE_COMMIT HEAD
-            if git diff --name-only $BASE_COMMIT HEAD | grep -E '^(src/)' > /dev/null; then
-              echo "Detected changes in src/"
+            if git diff --name-only $BASE_COMMIT HEAD | grep -E '^(src/|README)' > /dev/null; then
+              echo "Detected changes in src/ or README"
               echo "changed=true" >> $GITHUB_OUTPUT
             else
-              echo "No changes detected in src/"
+              echo "No changes detected in src/ or README"
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
           fi
