@@ -23,10 +23,9 @@
       }
     },
     {
-      "label": "Run Unit Tests in Docker (Run inside the .devcontainer)",
-      "dependsOn": "Unit Test Cleanup Docker Compose",
+      "label": "Run Unit Tests (Run inside the .devcontainer)",
       "type": "shell",
-      "command": "pytest",
+      "command": "pytest -v",
       "options": {
         "cwd": "${workspaceFolder}/tests"
       },
