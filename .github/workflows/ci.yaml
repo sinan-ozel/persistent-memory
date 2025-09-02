@@ -56,6 +56,7 @@ jobs:
           git push origin HEAD:${{ github.ref }}
 
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     needs: reformat
     steps:
@@ -77,6 +78,7 @@ jobs:
           ruff check ./src
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     needs: reformat
     steps:
