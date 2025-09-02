@@ -5,7 +5,7 @@ import time
 import pytest
 import redis
 
-from redis_memory import Memory
+from redis_memory import Memory, SyncedDict, SyncedList
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -236,7 +236,7 @@ def test_delete_attribute_queues_if_redis_down(monkeypatch):
         _ = mem_down.queued_key
 
     # Check deletion was queued (None marks deletion)
-    assert ("queued_key", None) in mem_down._queue
+    assert any(q[0] == "queued_key" and q[1]["value"] is None for q in mem_down._queue)
 
 
 @pytest.mark.depends(on=[
@@ -347,3 +347,51 @@ def test_works_if_redis_never_comes_alive(monkeypatch):
 
     monkeypatch.setenv('REDIS_HOST', 'redis')
     monkeypatch.setenv('REDIS_PORT', '6379')
+
+
+@pytest.mark.depends(on=['test_set_and_delete_attribute'])
+def test_append_to_list():
+    """Test that appending to a list attribute persists across Memory instances."""
+    mem1 = Memory()
+    mem1.numbers = [1, 2]
+    assert type(mem1.numbers) == SyncedList
+    mem1.numbers.append(3)
+
+    mem2 = Memory()
+    assert mem2.numbers == [1, 2, 3]
+
+
+@pytest.mark.depends(on=['test_set_and_delete_attribute'])
+def test_extend_list():
+    """Test that extending a list attribute persists across Memory instances."""
+    mem1 = Memory()
+    mem1.numbers = [1, 2]
+    mem1.numbers.extend([3, 4])
+
+    mem2 = Memory()
+    assert mem2.numbers == [1, 2, 3, 4]
+
+
+@pytest.mark.depends(on=['test_set_and_delete_attribute'])
+def test_update_dict():
+    """Test that updating a dict attribute persists across Memory instances."""
+    mem1 = Memory()
+    mem1.data = {"a": 1}
+    assert type(mem1.data) == SyncedDict
+    mem1.data.update({"b": 2})
+
+    mem2 = Memory()
+    assert mem2.data == {"a": 1, "b": 2}
+
+
+@pytest.mark.depends(on=['test_set_and_delete_attribute'])
+def test_update_dict_in_context():
+    """Test that updating a dict attribute persists across Memory instances."""
+    with Memory() as memory:
+        memory.data = {"a": 1}
+        memory.data.update({"b": 2})
+
+    del memory
+
+    with Memory() as memory:
+        assert memory.data == {"a": 1, "b": 2}

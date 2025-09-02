@@ -1,5 +1,6 @@
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 
+from typing import Any
 import json
 import logging
 import os
@@ -10,6 +11,51 @@ import redis
 
 logger = logging.getLogger("redis_memory")
 logger.setLevel(os.environ.get("MEMORY_LOG_LEVEL", 'WARNING'))
+
+
+class SyncedList(list):
+    def __init__(self, iterable, parent, topmost_key: str):
+        super().__init__(iterable)
+        self._parent = parent
+        self._topmost_key = topmost_key
+
+    def append(self, item):
+        super().append(item)
+        self._parent.sync(self._topmost_key)
+
+    def extend(self, iterable):
+        super().extend(iterable)
+        self._parent.sync(self._topmost_key)
+
+    def sync(self, name):
+        self._parent.sync(self._topmost_key)
+
+
+class SyncedDict(dict):
+    def __init__(self, mapping, parent, topmost_key: str):
+        super().__init__(mapping)
+        self._parent = parent
+        self._topmost_key = topmost_key
+
+    def __setitem__(self, k, v):
+        super().__setitem__(k, v)
+        self._parent.sync(self._topmost_key)
+
+    def update(self, *args, **kwargs):
+        super().update(*args, **kwargs)
+        self._parent.sync(self._topmost_key)
+
+    def sync(self):
+        self._parent.sync(self._topmost_key)
+
+
+def wrap_sync(obj: (list|dict), parent, topmost_key: str):  # Add topmost_key parameter
+    """Wrap an object to synchronize its attributes with Redis."""
+    if isinstance(obj, dict):
+        return SyncedDict(obj, parent, topmost_key)
+    elif isinstance(obj, list):
+        return SyncedList(obj, parent, topmost_key)
+    return obj
 
 
 class Memory:
@@ -124,17 +170,25 @@ class Memory:
 
         # Flush the entire queue
         while self._queue:
-            key, value = self._queue.pop(0)
+            key, payload = self._queue.pop(0)
+            value = payload.get('value')
+            queued_timestamp = payload.get('last_modified')
+
+            # Get current Redis value and timestamp
+            raw = client.get(self._key(key))
+            redis_timestamp = 0
+            if raw is not None:
+                obj = json.loads(raw)
+                redis_timestamp = obj.get("last_modified", 0)
+
+            # If Redis timestamp is later than queued, skip this item
+            if redis_timestamp > queued_timestamp:
+                continue
+
             if value is None:
-                try:
-                    client.delete(self._key(key))
-                except Exception as e:
-                    logger.exception("Failed to delete key %s: %s", key, e)
+                client.delete(self._key(key))
             else:
-                try:
-                    client.set(self._key(key), json.dumps(value))
-                except Exception as e:
-                    logger.exception("Failed to set key %s: %s", key, e)
+                client.set(self._key(key), json.dumps(payload))
             self._is_connected_to_redis_at_least_once = True
 
     def _background_flush_loop(self):
@@ -199,7 +253,10 @@ class Memory:
             logger.error("Cannot serialize value for attribute '%s'", name)
             raise
 
-        self._attributes[name] = value
+        self._set(name, value)
+
+    def _set(self, name: str, value: Any):
+        self._attributes[name] = wrap_sync(value, self, name)
         timestamp = time.time_ns()
         self._last_modified[name] = timestamp
         payload = {"value": value, "last_modified": timestamp}
@@ -215,7 +272,7 @@ class Memory:
         client.set(self._key(name), json.dumps(payload))
         self._is_connected_to_redis_at_least_once = True
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         """Get an attribute from Redis or fall back to local cache.
 
         Raises:
@@ -227,7 +284,7 @@ class Memory:
         try:
             client = self._connect()
         except Exception:
-            logger.warning("Memory cannot access redis to retrieve %s.")
+            logger.warning("Memory cannot access redis to retrieve %s.", name)
             value = self._attributes.get(name)  # Fall back to local cache
             if value is not None:
                 return value
@@ -235,19 +292,57 @@ class Memory:
 
         raw = client.get(self._key(name))
         if raw is not None:
-            obj = json.loads(raw)
-            if (isinstance(obj, dict) and "value" in obj
-                    and "last_modified" in obj):
-                value = obj["value"]
-                self._attributes[name] = value
-                self._last_modified[name] = obj["last_modified"]
-            else:
-                value = obj
-                self._attributes[name] = value
             self._is_connected_to_redis_at_least_once = True
-            return value
+            obj = json.loads(raw)
+            value = obj["value"]
+            self._attributes[name] = wrap_sync(value, self, name)
+            self._last_modified[name] = obj["last_modified"]
+
+            return self._attributes[name]
 
         raise AttributeError(f"'Memory' object has no attribute '{name}'")
+
+    def sync(self, name: str):
+        """
+        Synchronize the value of a given attribute with Redis.
+        If the key does not exist in Redis, write the local value.
+        If it exists, compare last_modified timestamps and update the older one.
+        """
+        if name not in self._attributes:
+            raise AttributeError(f"'Memory' object has no attribute '{name}'")
+
+        local_value = self._attributes[name]
+        local_last_modified = self._last_modified.get(name, 0)
+        payload = {"value": local_value, "last_modified": local_last_modified}
+
+        try:
+            client = self._connect()
+        except Exception:
+            logger.warning("Redis unavailable. Queuing %s = %s", name, local_value)
+            self._queue.append((name, payload))
+            return
+
+        raw = client.get(self._key(name))
+
+        if raw is None:
+            # Key does not exist in Redis, write local value
+            client.set(self._key(name), json.dumps(payload))
+            self._is_connected_to_redis_at_least_once = True
+            return
+
+        obj = json.loads(raw)
+        redis_value = obj.get("value", obj)
+        redis_last_modified = obj.get("last_modified", 0)
+
+        if local_last_modified >= redis_last_modified:
+            # Local is newer, update Redis
+            payload = {"value": local_value, "last_modified": local_last_modified}
+            client.set(self._key(name), json.dumps(payload))
+            self._is_connected_to_redis_at_least_once = True
+        elif redis_last_modified > local_last_modified:
+            # Redis is newer, update local
+            self._attributes[name] = wrap_sync(redis_value, self, name)
+            self._last_modified[name] = redis_last_modified
 
     def __delattr__(self, name):
         """Delete an attribute from local cache and Redis (or queue
@@ -271,13 +366,16 @@ class Memory:
         try:
             client = self._connect()
         except Exception:
-            logger.warning("Memory cannot access redis to delete %s.")
-            self._queue.append((name, None))
+            logger.warning("Memory cannot access redis to delete %s.", name)
+            timestamp = time.time_ns()
+            payload = {"value": None, "last_modified": timestamp}
+            self._queue.append((name, payload))
 
         try:
             client.delete(self._key(name))
             self._is_connected_to_redis_at_least_once = True
         except UnboundLocalError:
+            # This catch fixes the race conditions where the queue might get to the value before this does.
             pass
 
 

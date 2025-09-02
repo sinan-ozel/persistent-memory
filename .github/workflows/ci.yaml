@@ -142,6 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      contents: write
     needs: [test, lint, detect_changes]
     if: needs.detect_changes.outputs.changed == 'true' && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.event.pull_request.merged == true)  # Only run on push to main or merge to main
     steps:
@@ -191,7 +192,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "v$CURRENT_VERSION" != "$LAST_TAG" ]]; then
+          TAG_COUNT=$(git tag | wc -l)
+          if [[ "v$CURRENT_VERSION" != "$LAST_TAG" || "$TAG_COUNT" -eq 0 ]]; then
             echo "VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
             echo "is_stable=true" >> $GITHUB_ENV
           else
