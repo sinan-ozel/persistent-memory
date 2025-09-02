@@ -1,5 +1,5 @@
-![Lint](https://github.com/sinan-ozel/redis-memory/actions/workflows/ci.yaml/badge.svg?branch=main&job=lint)
-![Test](https://github.com/sinan-ozel/redis-memory/actions/workflows/ci.yaml/badge.svg?branch=main&job=test)
+![Lint](https://img.shields.io/github/check-runs/sinan-ozel/redis-memory/main?nameFilter=lint&label=lint)
+![Tests](https://img.shields.io/github/check-runs/sinan-ozel/redis-memory/main?nameFilter=test&label=test)
 ![PyPI](https://img.shields.io/pypi/v/redis-memory.svg)
 ![PyPI downloads](https://img.shields.io/pypi/dm/redis-memory.svg?label=downloads&logo=pypi)
 ![License](https://img.shields.io/github/license/sinan-ozel/redis-memory.svg)
