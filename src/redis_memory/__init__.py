@@ -1,4 +1,4 @@
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 import json
 import logging
@@ -16,6 +16,8 @@ logger.setLevel(os.environ.get("MEMORY_LOG_LEVEL", 'WARNING'))
 class SyncedList(list):
 
     def __init__(self, iterable, parent, topmost_key: str):
+        for i, item in enumerate(iterable):
+            iterable[i] = wrap_sync(item, self, f"{topmost_key}[{i}]")
         super().__init__(iterable)
         self._parent = parent
         self._topmost_key = topmost_key
@@ -28,13 +30,15 @@ class SyncedList(list):
         super().extend(iterable)
         self._parent.sync(self._topmost_key)
 
-    def sync(self, name):
+    def sync(self, name: str):
         self._parent.sync(self._topmost_key)
 
 
 class SyncedDict(dict):
 
     def __init__(self, mapping, parent, topmost_key: str):
+        for k, v in mapping.items():
+            mapping[k] = wrap_sync(v, self, topmost_key)
         super().__init__(mapping)
         self._parent = parent
         self._topmost_key = topmost_key
@@ -47,7 +51,7 @@ class SyncedDict(dict):
         super().update(*args, **kwargs)
         self._parent.sync(self._topmost_key)
 
-    def sync(self):
+    def sync(self, name: str):
         self._parent.sync(self._topmost_key)
 
 
@@ -164,7 +168,13 @@ class Memory:
         return f"{self._prefix}{name}"
 
     def _flush_queue(self):
-        """Keep trying to connect to Redis and flush when connected."""
+        """Flush all queued updates to Redis.
+
+        For each item in the queue, compare the queued timestamp with
+        the timestamp stored in Redis. If the Redis value is newer, skip
+        the update or deletion. Otherwise, update or delete the Redis
+        key accordingly.
+        """
         while True:
             try:
                 client = self._connect()
@@ -196,14 +206,20 @@ class Memory:
             self._is_connected_to_redis_at_least_once = True
 
     def _background_flush_loop(self):
+        """Background thread loop that periodically flushes the queue to
+        Redis.
+
+        Continuously checks if there are items in the queue and calls
+        _flush_queue if needed, sleeping for 1 second between checks.
+        Stops when the stop event is set.
+        """
         while not self._stop_event.is_set():
             if self._queue:
                 self._flush_queue()
             time.sleep(1)
 
     def start_background_flush(self):
-        """Start the background thread to flush the queue
-        periodically."""
+        """Start the background thread to flush the queue regularly."""
         if self._thread is None or not self._thread.is_alive():
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._background_flush_loop,
@@ -218,8 +234,8 @@ class Memory:
             self._thread = None
 
     def _load_from_redis(self):
-        """Load all keys with the current prefix from Redis into local
-        cache."""
+        """Load all keys with the current prefix from Redis into
+        local."""
         try:
             client = self._connect()
             pattern = f"{self._prefix}*"
@@ -260,6 +276,12 @@ class Memory:
         self._set(name, value)
 
     def _set(self, name: str, value: Any):
+        """Set an attribute value in local cache and attempt to store it
+        in Redis.
+
+        Updates the local cache and last modified timestamp. If Redis is
+        unavailable, queues the update for later syncing.
+        """
         self._attributes[name] = wrap_sync(value, self, name)
         timestamp = time.time_ns()
         self._last_modified[name] = timestamp

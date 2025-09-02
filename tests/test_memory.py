@@ -385,7 +385,7 @@ def test_update_dict():
     assert mem2.data == {"a": 1, "b": 2}
 
 
-@pytest.mark.depends(on=['test_set_and_delete_attribute'])
+@pytest.mark.depends(on=['test_update_dict'])
 def test_update_dict_in_context():
     """Test that updating a dict attribute persists across Memory instances."""
     with Memory() as memory:
@@ -396,3 +396,30 @@ def test_update_dict_in_context():
 
     with Memory() as memory:
         assert memory.data == {"a": 1, "b": 2}
+
+
+@pytest.mark.depends(on=['test_append_to_list'])
+def test_append_to_a_nested_list():
+    """Test that appending to a list attribute persists across Memory instances."""
+    mem1 = Memory()
+    mem1.list_of_lists_of_numbers = [[1, 2], [3, 4]]
+    assert type(mem1.list_of_lists_of_numbers) == SyncedList
+    assert type(mem1.list_of_lists_of_numbers[1]) == SyncedList
+    mem1.list_of_lists_of_numbers[1].append(5)
+
+    mem2 = Memory()
+    assert mem2.list_of_lists_of_numbers == [[1, 2], [3, 4, 5]]
+
+
+@pytest.mark.depends(on=['test_update_dict'])
+def test_update_nested_dict():
+    """Test that updating a nested dict attribute persists across Memory instances."""
+    mem1 = Memory()
+    mem1.data = {"a": 1, "b": {"c": 2}}
+    assert type(mem1.data["b"]) == SyncedDict
+    mem1.data["b"].update({"d": 3})
+    assert mem1.data == {"a": 1, "b": {"c": 2, "d": 3}}
+
+    mem2 = Memory()
+    assert type(mem2.data["b"]) == SyncedDict
+    assert mem2.data == {"a": 1, "b": {"c": 2, "d": 3}}
