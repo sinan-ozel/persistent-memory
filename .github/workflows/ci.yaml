@@ -12,6 +12,7 @@ on:
 
 jobs:
   reformat:
+    name: Reformat Code
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -56,7 +57,7 @@ jobs:
           git push origin HEAD:${{ github.ref }}
 
   lint:
-    name: Lint
+    name: Lint the Codebase
     runs-on: ubuntu-latest
     needs: reformat
     steps:
@@ -99,6 +100,7 @@ jobs:
           docker-compose up --build --remove-orphans --force-recreate --abort-on-container-exit --exit-code-from test
 
   detect_changes:
+    name: Detect if Codebase Changed
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.set_changed.outputs.changed }}
@@ -141,6 +143,7 @@ jobs:
           fi
 
   publish:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
     permissions:
       id-token: write
