@@ -236,7 +236,8 @@ def test_delete_attribute_queues_if_redis_down(monkeypatch):
         _ = mem_down.queued_key
 
     # Check deletion was queued (None marks deletion)
-    assert any(q[0] == "queued_key" and q[1]["value"] is None for q in mem_down._queue)
+    assert any(q[0] == "queued_key" and q[1]["value"] is None
+               for q in mem_down._queue)
 
 
 @pytest.mark.depends(on=[

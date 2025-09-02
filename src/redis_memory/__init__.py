@@ -1,11 +1,11 @@
 __version__ = "0.3.0"
 
-from typing import Any
 import json
 import logging
 import os
 import threading
 import time
+from typing import Any
 
 import redis
 
@@ -14,6 +14,7 @@ logger.setLevel(os.environ.get("MEMORY_LOG_LEVEL", 'WARNING'))
 
 
 class SyncedList(list):
+
     def __init__(self, iterable, parent, topmost_key: str):
         super().__init__(iterable)
         self._parent = parent
@@ -32,6 +33,7 @@ class SyncedList(list):
 
 
 class SyncedDict(dict):
+
     def __init__(self, mapping, parent, topmost_key: str):
         super().__init__(mapping)
         self._parent = parent
@@ -49,7 +51,8 @@ class SyncedDict(dict):
         self._parent.sync(self._topmost_key)
 
 
-def wrap_sync(obj: (list|dict), parent, topmost_key: str):  # Add topmost_key parameter
+def wrap_sync(obj: (list | dict), parent, topmost_key: str
+              ):  # Add topmost_key parameter
     """Wrap an object to synchronize its attributes with Redis."""
     if isinstance(obj, dict):
         return SyncedDict(obj, parent, topmost_key)
@@ -144,7 +147,8 @@ class Memory:
         """Establish a new Redis connection.
 
         Returns:
-            redis.Redis or None: A Redis client if connection works; otherwise None.
+            redis.Redis or None: A Redis client if connection works;
+            otherwise None.
         """
         client = redis.Redis(
             host=self._host,
@@ -303,10 +307,11 @@ class Memory:
         raise AttributeError(f"'Memory' object has no attribute '{name}'")
 
     def sync(self, name: str):
-        """
-        Synchronize the value of a given attribute with Redis.
-        If the key does not exist in Redis, write the local value.
-        If it exists, compare last_modified timestamps and update the older one.
+        """Synchronize the value of a given attribute with Redis.
+
+        If the key does not exist in Redis, write the local value. If it
+        exists, compare last_modified timestamps and update the older
+        one.
         """
         if name not in self._attributes:
             raise AttributeError(f"'Memory' object has no attribute '{name}'")
@@ -318,7 +323,8 @@ class Memory:
         try:
             client = self._connect()
         except Exception:
-            logger.warning("Redis unavailable. Queuing %s = %s", name, local_value)
+            logger.warning("Redis unavailable. Queuing %s = %s", name,
+                           local_value)
             self._queue.append((name, payload))
             return
 
@@ -336,7 +342,10 @@ class Memory:
 
         if local_last_modified >= redis_last_modified:
             # Local is newer, update Redis
-            payload = {"value": local_value, "last_modified": local_last_modified}
+            payload = {
+                "value": local_value,
+                "last_modified": local_last_modified
+            }
             client.set(self._key(name), json.dumps(payload))
             self._is_connected_to_redis_at_least_once = True
         elif redis_last_modified > local_last_modified:
